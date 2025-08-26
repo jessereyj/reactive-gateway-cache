@@ -1,6 +1,6 @@
 # ☁️ Reactive Edge Gateway with Caffeine Cache
 
-A fully reactive edge gateway built with **Spring Boot 3.5.14** and **Spring Cloud Gateway**, featuring an **in-memory Caffeine cache** that short-circuits repeat GET requests by serving cached bodies directly. Designed for high-throughput environments with safe defaults for TTL, size limits, and header hygiene.
+A fully reactive edge gateway built with **Spring Boot 3.5** and **Spring Cloud Gateway**, featuring an **in-memory Caffeine cache** that short-circuits repeat GET requests by serving cached bodies directly. Designed for high-throughput environments with safe defaults for TTL, size limits, and header hygiene.
 
 ---
 
