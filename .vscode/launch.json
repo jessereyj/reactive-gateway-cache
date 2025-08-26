@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-ReactiveGatewayCacheApplication<reactive-gateway-cache>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.learn.developer.ReactiveGatewayCacheApplication",
+            "projectName": "reactive-gateway-cache",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
