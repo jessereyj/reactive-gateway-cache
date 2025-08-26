@@ -20,7 +20,7 @@ A fully reactive edge gateway built with **Spring Boot 3.5** and **Spring Cloud 
 
 | Component              | Version        |
 |------------------------|----------------|
-| Spring Boot            | 3.5.14         |
+| Spring Boot            | 3.5.5         |
 | Spring Cloud Gateway   | 2024.0.3       |
 | Spring WebFlux         | Reactive       |
 | Caffeine Cache         | Latest stable  |
