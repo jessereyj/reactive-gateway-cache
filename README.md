@@ -20,7 +20,7 @@ A fully reactive edge gateway built with **Spring Boot 3.5** and **Spring Cloud 
 
 | Component              | Version        |
 |------------------------|----------------|
-| Spring Boot            | 3.5.5         |
+| Spring Boot            | 3.5.5          |
 | Spring Cloud Gateway   | 2024.0.3       |
 | Spring WebFlux         | Reactive       |
 | Caffeine Cache         | Latest stable  |
@@ -28,10 +28,79 @@ A fully reactive edge gateway built with **Spring Boot 3.5** and **Spring Cloud 
 
 ---
 
-## 🛠️ Setup
+## Highlights
+- ✅ **Reactive** end-to-end (non-blocking capture and replay of response bodies)
+- 🧠 **Caffeine** with weighted eviction by body size and global TTL
+- 🛡️ **Header hygiene** (no `Set-Cookie*` copied, no hop-by-hop headers)
+- 🔄 **Vary** support (`Accept`, `Accept-Encoding`, `Accept-Language`) to keep content-negotiation safe
+- 🚫 **Bypass controls**: `Cache-Control: no-cache` or `X-Bypass-Cache: true`
+- 🔐 **Auth-aware**: skip caching if request has `Authorization` (configurable)
+- 📊 **Metrics**: Micrometer gauges + Caffeine stats via `/admin/cache/stats` and Actuator
+- 🧹 **Eviction**: `/admin/cache/clear` & `/admin/cache/evict`
 
-### Clone the project
+---
 
+## Quick start
 ```bash
-git clone https://github.com/your-org/reactive-gateway-cache.git
-cd reactive-gateway-cache
+mvn spring-boot:run
+```
+
+Open Swagger UI at `http://localhost:8080/swagger-ui.html`.
+
+---
+
+## 🔍 How to Test Caching with curl
+
+### 1. First request → MISS (stores in cache)
+```bash
+curl -i http://localhost:8080/users
+```
+Response headers will include:
+```
+X-Cache: MISS
+```
+
+### 2. Second request → HIT (served from cache)
+```bash
+curl -i http://localhost:8080/users
+```
+Response headers now include:
+```
+X-Cache: HIT
+Age: <seconds since cached>
+```
+
+### 3. Check cache stats via Admin API
+```bash
+curl -s -H "X-API-Key: changeme" http://localhost:8080/admin/cache/stats | jq
+```
+Example output:
+```json
+{
+  "missCount": 5,
+  "estimatedSize": 1,
+  "hitCount": 1,
+  "hitRate": 0.16666666666666666,
+  "evictionCount": 0,
+  "maxWeightBytes": 104857600
+}
+```
+
+### 4. Evict all entries
+```bash
+curl -X DELETE -H "X-API-Key: changeme" http://localhost:8080/admin/cache/clear
+```
+
+### 5. Evict a specific entry
+```bash
+curl -X DELETE -H "X-API-Key: changeme" \
+  "http://localhost:8080/admin/cache/evict?method=GET&pathAndQuery=/users"
+```
+
+---
+
+## Notes
+- Only `200 OK` with bodies ≤ `gateway.cache.max-body-bytes` are cached.
+- Upstream `Cache-Control: no-store` or `private` disables caching (unless normalized by filters).
+- Upstream `Cache-Control: max-age=N` is respected (min of upstream and local TTL).
+- Add `X-API-Key` header matching `gateway.cache.admin.api-key` to call admin endpoints (leave empty to disable auth).

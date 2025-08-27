@@ -1,0 +1,67 @@
+openapi: 3.0.1
+info:
+  title: Users API (Proxied by Spring Cloud Gateway)
+  version: "1.0.0"
+servers:
+  - url: /
+paths:
+  /users:
+    get:
+      summary: List users (proxied)
+      tags: [Users]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      summary: Create user (proxied)
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /users/{id}:
+    get:
+      summary: Get user by id (proxied)
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string, example: "123" }
+        name: { type: string, example: "Jane Doe" }
+        email: { type: string, example: "jane@example.com" }
+        createdAt: { type: string, example: "2025-08-27T06:35:12Z" }
+    UserCreate:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string, example: "Jane Doe" }
+        email: { type: string, example: "jane@example.com" }

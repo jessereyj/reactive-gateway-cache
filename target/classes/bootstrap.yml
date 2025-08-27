@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: reactive-gateway-cache
+
+  config:
+    import: optional:configserver:http://your-config-server:8888

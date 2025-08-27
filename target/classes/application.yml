@@ -1,0 +1,94 @@
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+spring:
+  main:
+    web-application-type: reactive
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          default-filters:
+            - name: AddResponseHeader
+              args:
+                name: Vary
+                value: Accept,Accept-Encoding,Accept-Language
+            - name: AddResponseHeader
+              args:
+                name: X-Gateway
+                value: reactive-edge
+
+          routes:
+            # GET /users/** -> MockAPI
+            - id: user-get
+              uri: https://68ae694ab91dfcdd62b9188c.mockapi.io/api/v1/users
+              predicates:
+                - name: Path
+                  args:
+                    pattern: /users/**
+                - name: Method
+                  args:
+                    methods: GET
+              filters:
+                - name: RewritePath
+                  args:
+                    regexp: /users/(?<path>.*)
+                    replacement: /${path}
+                # Normalize upstream cache headers so your cache can store
+                - name: RemoveResponseHeader
+                  args:
+                    name: Cache-Control
+                - name: AddResponseHeader
+                  args:
+                    name: Cache-Control
+                    value: public, max-age=60
+
+            # POST /users -> MockAPI (never cache)
+            - id: user-post
+              uri: https://68ae694ab91dfcdd62b9188c.mockapi.io/api/v1/users
+              predicates:
+                - name: Path
+                  args:
+                    pattern: /users
+                - name: Method
+                  args:
+                    methods: POST
+              filters:
+                - name: RewritePath
+                  args:
+                    regexp: /users
+                    replacement: /users
+                - name: AddResponseHeader
+                  args:
+                    name: Cache-Control
+                    value: no-store
+
+gateway:
+  cache:
+    enabled: true
+    ttl: PT60S
+    max-weight-bytes: 104857600
+    max-body-bytes: 524288          # ← single source of truth (512 KiB)
+    vary-headers: Accept,Accept-Encoding,Accept-Language
+    skip-when-authorization: true
+    add-xcache-header: true
+    add-age-header: true
+    admin:
+      api-key: changeme              # leave empty to disable auth
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
