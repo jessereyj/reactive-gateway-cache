@@ -108,14 +108,14 @@ curl -X DELETE -H "X-API-Key: changeme" \
 ---
 
 ## 📜 License
-
-This project is licensed under the [MIT License](LICENSE.txt).  
+This project is licensed under the MIT License.  
 You are free to use, modify, and distribute this code with proper attribution.  
-Contact: jessereyj@linux.com
+See the [LICENSE](LICENSE) file for details.
 
----
+## ⚠️ Disclaimer
+This is a **personal project** created independently outside of my employment.  
+It is **not a product of any organization**, nor does it represent the views, technologies, or intellectual property of any organization.  
+All code is released openly under the chosen license.
 
-> **Disclaimer**  
-> This project is a personal initiative and does not represent the views, technologies, or intellectual property of any company or organization. All code is original and developed independently by Jesserey.
 
 
