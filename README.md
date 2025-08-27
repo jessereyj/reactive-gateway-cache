@@ -104,3 +104,18 @@ curl -X DELETE -H "X-API-Key: changeme" \
 - Upstream `Cache-Control: no-store` or `private` disables caching (unless normalized by filters).
 - Upstream `Cache-Control: max-age=N` is respected (min of upstream and local TTL).
 - Add `X-API-Key` header matching `gateway.cache.admin.api-key` to call admin endpoints (leave empty to disable auth).
+
+---
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE.txt).  
+You are free to use, modify, and distribute this code with proper attribution.  
+Contact: jessereyj@linux.com
+
+---
+
+> **Disclaimer**  
+> This project is a personal initiative and does not represent the views, technologies, or intellectual property of any company or organization. All code is original and developed independently by Jesserey.
+
+
