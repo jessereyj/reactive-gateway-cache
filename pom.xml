@@ -17,6 +17,14 @@
 	<name>reactive-gateway-cache</name>
 	<description>Reactive Gateway with In-Memory Caffeine Cache</description>
 
+	<licenses>
+		<license>
+			<name>MIT License</name>
+			<url>https://opensource.org/licenses/MIT</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
 	<properties>
 		<java.version>21</java.version>
 		<!-- Spring Cloud "Northfields" for Boot 3.5.x -->
