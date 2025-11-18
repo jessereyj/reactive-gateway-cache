@@ -30,7 +30,7 @@
 		<!-- Spring Cloud "Northfields" for Boot 3.5.x -->
 		<spring-cloud.version>2025.0.0</spring-cloud.version>
 		<!-- Latest stable Caffeine as of 2025-08 -->
-		<caffeine.version>3.2.2</caffeine.version>
+		<caffeine.version>3.2.3</caffeine.version>
 		<springdoc.version>2.8.9</springdoc.version>
 	</properties>
 
