@@ -8,15 +8,16 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 public final class CachedResponse {
+
     private final byte[] body;
     private final int statusCode;
     private final MultiValueMap<String, String> headers;
     private final Instant storedAt;
-    private final long maxAgeSeconds; // if upstream provided Cache-Control: max-age
+    private final long maxAgeSeconds;
 
     public CachedResponse(byte[] body, int statusCode, MultiValueMap<String, String> headers, Instant storedAt,
             long maxAgeSeconds) {
-        this.body = body;
+        this.body = body == null ? new byte[0] : body.clone();
         this.statusCode = statusCode;
         this.headers = new LinkedMultiValueMap<>();
         if (headers != null) {
@@ -27,15 +28,21 @@ public final class CachedResponse {
     }
 
     public byte[] getBody() {
-        return body;
+        return body.clone();
     }
 
     public int getStatusCode() {
         return statusCode;
     }
 
+    public HttpStatusCode getStatus() {
+        return HttpStatusCode.valueOf(statusCode);
+    }
+
     public MultiValueMap<String, String> getHeaders() {
-        return headers;
+        MultiValueMap<String, String> copy = new LinkedMultiValueMap<>();
+        headers.forEach((k, v) -> copy.put(k, List.copyOf(v)));
+        return copy;
     }
 
     public Instant getStoredAt() {
@@ -46,11 +53,7 @@ public final class CachedResponse {
         return maxAgeSeconds;
     }
 
-    public HttpStatusCode status() {
-        return HttpStatusCode.valueOf(statusCode);
-    }
-
     public int weight() {
-        return body == null ? 0 : body.length;
+        return body.length;
     }
 }

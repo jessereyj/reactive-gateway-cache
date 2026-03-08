@@ -9,29 +9,33 @@
       "name": "gateway.cache.admin",
       "type": "com.learn.developer.cache.CacheProperties$Admin",
       "sourceType": "com.learn.developer.cache.CacheProperties",
-      "sourceMethod": "public com.learn.developer.cache.CacheProperties.Admin getAdmin() "
+      "sourceMethod": "getAdmin()"
     }
   ],
   "properties": [
     {
       "name": "gateway.cache.add-age-header",
       "type": "java.lang.Boolean",
-      "sourceType": "com.learn.developer.cache.CacheProperties"
+      "sourceType": "com.learn.developer.cache.CacheProperties",
+      "defaultValue": true
     },
     {
       "name": "gateway.cache.add-xcache-header",
       "type": "java.lang.Boolean",
-      "sourceType": "com.learn.developer.cache.CacheProperties"
+      "sourceType": "com.learn.developer.cache.CacheProperties",
+      "defaultValue": true
     },
     {
       "name": "gateway.cache.admin.api-key",
       "type": "java.lang.String",
-      "sourceType": "com.learn.developer.cache.CacheProperties$Admin"
+      "sourceType": "com.learn.developer.cache.CacheProperties$Admin",
+      "defaultValue": ""
     },
     {
       "name": "gateway.cache.enabled",
       "type": "java.lang.Boolean",
-      "sourceType": "com.learn.developer.cache.CacheProperties"
+      "sourceType": "com.learn.developer.cache.CacheProperties",
+      "defaultValue": true
     },
     {
       "name": "gateway.cache.max-body-bytes",
@@ -46,12 +50,14 @@
     {
       "name": "gateway.cache.skip-when-authorization",
       "type": "java.lang.Boolean",
-      "sourceType": "com.learn.developer.cache.CacheProperties"
+      "sourceType": "com.learn.developer.cache.CacheProperties",
+      "defaultValue": true
     },
     {
       "name": "gateway.cache.ttl",
       "type": "java.time.Duration",
-      "sourceType": "com.learn.developer.cache.CacheProperties"
+      "sourceType": "com.learn.developer.cache.CacheProperties",
+      "defaultValue": "60s"
     },
     {
       "name": "gateway.cache.vary-headers",
