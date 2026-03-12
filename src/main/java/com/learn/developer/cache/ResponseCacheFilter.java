@@ -71,7 +71,7 @@ public class ResponseCacheFilter implements GlobalFilter, Ordered {
         }
 
         if (props.isSkipWhenAuthorization()
-                && exchange.getRequest().getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
+                && exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION) != null) {
             return chain.filter(exchange);
         }
 
