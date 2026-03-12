@@ -4,9 +4,12 @@ import java.io.ByteArrayOutputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.reactivestreams.Publisher;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.filter.NettyWriteResponseFilter;
 import org.springframework.core.Ordered;
@@ -32,6 +35,8 @@ import reactor.core.publisher.Mono;
 public class ResponseCacheFilter implements GlobalFilter, Ordered {
 
     private static final String X_CACHE = "X-Cache";
+    private static final String X_BYPASS_CACHE = "X-Bypass-Cache";
+
     private final Cache<CacheKey, CachedResponse> cache;
     private final CacheProperties props;
 
@@ -42,72 +47,76 @@ public class ResponseCacheFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return NettyWriteResponseFilter.WRITE_RESPONSE_FILTER_ORDER - 1; // -2
+        return NettyWriteResponseFilter.WRITE_RESPONSE_FILTER_ORDER - 1;
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange,
-            org.springframework.cloud.gateway.filter.GatewayFilterChain chain) {
-        if (!props.isEnabled())
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        if (!props.isEnabled()) {
             return chain.filter(exchange);
+        }
 
-        // Only cache GET requests.
         HttpMethod method = exchange.getRequest().getMethod();
-        if (method == null || method != HttpMethod.GET)
+        if (method != HttpMethod.GET) {
             return chain.filter(exchange);
+        }
 
-        // Respect request no-cache / bypass header
         String reqCacheCtl = exchange.getRequest().getHeaders().getFirst(HttpHeaders.CACHE_CONTROL);
-        if (reqCacheCtl != null && reqCacheCtl.toLowerCase().contains("no-cache")) {
-            return chain.filter(exchange);
-        }
-        if ("true".equalsIgnoreCase(exchange.getRequest().getHeaders().getFirst("X-Bypass-Cache"))) {
+        if (reqCacheCtl != null && reqCacheCtl.toLowerCase(Locale.ROOT).contains("no-cache")) {
             return chain.filter(exchange);
         }
 
-        // Optional: skip if Authorization header present
+        if ("true".equalsIgnoreCase(exchange.getRequest().getHeaders().getFirst(X_BYPASS_CACHE))) {
+            return chain.filter(exchange);
+        }
+
         if (props.isSkipWhenAuthorization()
                 && exchange.getRequest().getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
             return chain.filter(exchange);
         }
 
         CacheKey key = CacheKey.from(exchange, props.getVaryHeaders());
-
-        // Cache hit fast-path
         CachedResponse hit = cache.getIfPresent(key);
         if (hit != null) {
             return writeFromCache(exchange, hit);
         }
 
-        // Cache miss: decorate response to capture body
         ServerHttpResponse original = exchange.getResponse();
         DataBufferFactory bufferFactory = original.bufferFactory();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.min(props.getMaxBodyBytes(), 512 * 1024));
+        AtomicBoolean overflow = new AtomicBoolean(false);
 
         ServerHttpResponseDecorator decorated = new ServerHttpResponseDecorator(original) {
+
             @Override
             public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
-                if (body instanceof Flux<? extends DataBuffer> flux) {
-                    Flux<DataBuffer> intercepted = flux.map(dataBuffer -> {
-                        int readable = dataBuffer.readableByteCount();
-                        if (baos.size() + readable <= props.getMaxBodyBytes()) {
-                            byte[] bytes = new byte[readable];
-                            dataBuffer.read(bytes);
-                            baos.write(bytes, 0, bytes.length);
-                            DataBufferUtils.release(dataBuffer);
-                            return bufferFactory.wrap(bytes);
-                        } else {
-                            // Too large: bypass caching but still stream to client
-                            return dataBuffer; // pass-through (do not read/consume)
-                        }
-                    });
+                Flux<? extends DataBuffer> source = Flux.from(body);
 
-                    return super.writeWith(intercepted)
-                            .doOnTerminate(() -> maybeStore(exchange, baos.toByteArray()))
-                            .onErrorResume(ex -> super.writeWith(Flux.empty()));
-                }
-                return super.writeWith(body);
+                Flux<DataBuffer> intercepted = source.map(dataBuffer -> {
+                    if (overflow.get()) {
+                        return dataBuffer;
+                    }
+
+                    int readable = dataBuffer.readableByteCount();
+                    if (baos.size() + readable <= props.getMaxBodyBytes()) {
+                        byte[] bytes = new byte[readable];
+                        dataBuffer.read(bytes);
+                        DataBufferUtils.release(dataBuffer);
+                        baos.write(bytes, 0, bytes.length);
+                        return bufferFactory.wrap(bytes);
+                    }
+
+                    overflow.set(true);
+                    return dataBuffer;
+                });
+
+                return super.writeWith(intercepted)
+                        .doOnSuccess(ignored -> {
+                            if (!overflow.get()) {
+                                maybeStore(exchange, baos.toByteArray());
+                            }
+                        });
             }
         };
 
@@ -116,84 +125,109 @@ public class ResponseCacheFilter implements GlobalFilter, Ordered {
 
     private Mono<Void> writeFromCache(ServerWebExchange exchange, CachedResponse cached) {
         ServerHttpResponse resp = exchange.getResponse();
-        resp.setStatusCode(cached.status());
+        resp.setStatusCode(cached.getStatus());
 
-        // Copy headers with hygiene: drop Set-Cookie* and hop-by-hop headers
         cached.getHeaders().forEach((name, values) -> {
             if (!isSensitive(name)) {
-                resp.getHeaders().put(name, values);
+                resp.getHeaders().put(name, List.copyOf(values));
             }
         });
 
-        // Enrich with Age and X-Cache
         if (props.isAddAgeHeader()) {
             long age = Math.max(0, Duration.between(cached.getStoredAt(), Instant.now()).getSeconds());
             resp.getHeaders().set(HttpHeaders.AGE, String.valueOf(age));
         }
+
         if (props.isAddXcacheHeader()) {
             resp.getHeaders().set(X_CACHE, "HIT");
         }
 
-        // Ensure Content-Length and write body
         byte[] body = cached.getBody();
         resp.getHeaders().setContentLength(body.length);
-        DataBufferFactory f = resp.bufferFactory();
-        return resp.writeWith(Mono.just(f.wrap(body)));
+        return resp.writeWith(Mono.just(resp.bufferFactory().wrap(body)));
     }
 
     private boolean isSensitive(String header) {
-        String h = header == null ? "" : header.toLowerCase();
-        return h.equals("set-cookie") || h.equals("set-cookie2") || h.equals("transfer-encoding");
+        String h = header == null ? "" : header.toLowerCase(Locale.ROOT);
+        return h.equals("set-cookie")
+                || h.equals("set-cookie2")
+                || h.equals("connection")
+                || h.equals("keep-alive")
+                || h.equals("proxy-authenticate")
+                || h.equals("proxy-authorization")
+                || h.equals("te")
+                || h.equals("trailer")
+                || h.equals("transfer-encoding")
+                || h.equals("upgrade");
     }
 
     private void maybeStore(ServerWebExchange exchange, byte[] body) {
-        if (body == null)
+        if (body == null || body.length == 0 || body.length > props.getMaxBodyBytes()) {
             return;
-        if (body.length == 0)
-            return; // don't cache empty bodies
-        if (body.length > props.getMaxBodyBytes())
-            return; // guardrail
+        }
 
-        HttpStatusCode status = Objects.requireNonNullElse(exchange.getResponse().getStatusCode(),
+        HttpStatusCode status = Objects.requireNonNullElse(
+                exchange.getResponse().getStatusCode(),
                 HttpStatusCode.valueOf(200));
-        if (status.value() != 200)
-            return; // cache only 200 OK by default
 
-        HttpHeaders h = exchange.getResponse().getHeaders();
+        if (status.value() != 200) {
+            return;
+        }
 
-        // Respect upstream Cache-Control: no-store / private
-        String respCacheCtl = h.getFirst(HttpHeaders.CACHE_CONTROL);
+        HttpHeaders headers = exchange.getResponse().getHeaders();
+
+        String respCacheCtl = headers.getFirst(HttpHeaders.CACHE_CONTROL);
         if (respCacheCtl != null) {
-            String v = respCacheCtl.toLowerCase();
-            if (v.contains("no-store") || v.contains("private"))
+            String v = respCacheCtl.toLowerCase(Locale.ROOT);
+            if (v.contains("no-store") || v.contains("private")) {
                 return;
+            }
         }
 
         long maxAgeSeconds = extractMaxAgeSeconds(respCacheCtl);
 
         MultiValueMap<String, String> headersCopy = new LinkedMultiValueMap<>();
-        h.forEach((k, v) -> headersCopy.put(k, List.copyOf(v)));
+        headers.forEach((k, v) -> {
+            if (!isSensitive(k)) {
+                headersCopy.put(k, List.copyOf(v));
+            }
+        });
 
-        CachedResponse value = new CachedResponse(body, status.value(), headersCopy, Instant.now(), maxAgeSeconds);
+        CachedResponse value = new CachedResponse(
+                body,
+                status.value(),
+                headersCopy,
+                Instant.now(),
+                maxAgeSeconds);
 
         CacheKey key = CacheKey.from(exchange, props.getVaryHeaders());
         cache.put(key, value);
     }
 
     private long extractMaxAgeSeconds(String cacheControl) {
-        if (cacheControl == null)
+        if (cacheControl == null) {
             return -1;
-        String v = cacheControl.toLowerCase();
+        }
+
+        String v = cacheControl.toLowerCase(Locale.ROOT);
         int idx = v.indexOf("max-age=");
-        if (idx < 0)
+        if (idx < 0) {
             return -1;
+        }
+
         int start = idx + 8;
         int end = start;
-        while (end < v.length() && Character.isDigit(v.charAt(end)))
+        while (end < v.length() && Character.isDigit(v.charAt(end))) {
             end++;
+        }
+
+        if (start == end) {
+            return -1;
+        }
+
         try {
             return Long.parseLong(v.substring(start, end));
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return -1;
         }
     }
