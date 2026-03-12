@@ -27,7 +27,7 @@ Describe how you tested your changes:
 
 ## 🛡️ Compliance & Compatibility
 
-- [ ] Compatible with JDK 21
+- [ ] Compatible with JDK 25
 - [ ] No deprecated APIs introduced
 - [ ] Reproducible build confirmed via `./mvnw clean verify`
 

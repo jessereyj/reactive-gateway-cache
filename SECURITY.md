@@ -24,9 +24,9 @@ declined, etc.
 
 This project uses:
 
-- Spring Boot 3.5.5
-- Spring Cloud Gateway (2025.0.0)
-- Caffeine Cache (3.2.2)
+- Spring Boot 4.0.3
+- Spring Cloud Gateway (2025.1.0)
+- Caffeine Cache (3.2.3)
 
 Please include:
 
